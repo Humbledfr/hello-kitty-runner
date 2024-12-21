@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello Kitty Runner</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #fce4ec; /* Hello Kitty pink theme */
+        }
+        canvas {
+            display: block;
+            margin: auto;
+        }
+        #banner {
+            position: absolute;
+            top: 0; /* Moves the banner higher */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 15%;
+            max-width: 800px;
+        }
+        #score {
+            position: absolute;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+            color: pink;
+            font-family: Arial, sans-serif;
+        }
+        #highscore {
+            position: absolute;
+            top: 160px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+            color: #ff69b4;
+            font-family: Arial, sans-serif;
+        }
+        #restartButton {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #f8bbd0;
+            border: none;
+            border-radius: 5px;
+            color: #880e4f;
+        }
+    </style>
+</head>
+<body>
+    <audio id="backgroundMusic" loop autoplay>
+        <source src="./path_to_background_music.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+    <img id="banner" src="./banner_image.png" alt="Game Banner">
+    <div id="score">Score: 0</div>
+    <div id="highscore">High Score: 0</div>
+    <canvas id="gameCanvas"></canvas>
+    <button id="restartButton">Restart</button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 800;
+        canvas.height = 400;
+
+        // Game variables
+        let isJumping = false;
+        let jumpVelocity = 0;
+        let gravity = 0.5;
+        let score = 0;
+        let highScore = 0;
+        let isGameOver = false;
+        const obstacles = [];
+        const obstacleInterval = 120;
+
+        // Character (Hello Kitty)
+        const kitty = {
+            x: 50,
+            y: canvas.height - 100,
+            width: 90,
+            height: 90,
+            sprite: new Image(),
+            draw() {
+                ctx.drawImage(this.sprite, this.x, this.y, this.width, this.height);
+            }
+        };
+        kitty.sprite.src = './path_to_hello_kitty_sprite.png'; // Replace with actual sprite URL
+
+        // Obstacles
+        class Obstacle {
+            constructor(x, width, height, image) {
+                this.x = x;
+                this.y = canvas.height - height - 10; // Adjusted to account for thinner grass
+                this.width = width;
+                this.height = height;
+                this.image = image;
+            }
+
+            draw() {
+                if (this.image) {
+                    ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = '#d81b60'; // Default obstacle color
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+
+            update() {
+                this.x -= 5; // Move obstacle to the left
+                this.draw();
+            }
+        }
+
+        // Load obstacle image
+        const obstacleImage = new Image();
+        obstacleImage.src = './path_to_obstacle_image.png'; // Replace with actual obstacle image URL
+
+        // Draw grass at the bottom of the canvas
+        function drawGround() {
+            const gradient = ctx.createLinearGradient(0, canvas.height - 10, canvas.width, canvas.height);
+            gradient.addColorStop(0, '#006400'); // Deep green
+            gradient.addColorStop(1, '#fce4ec'); // Pink gradient at the edge
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, canvas.height - 10, canvas.width, 10); // Thinner grass area
+        }
+
+        // Restart button
+        const restartButton = document.getElementById('restartButton');
+
+        restartButton.addEventListener('click', () => {
+            restartButton.style.display = 'none';
+            restartGame();
+        });
+
+        function showGameOverScreen() {
+            isGameOver = true;
+            restartButton.style.display = 'block';
+
+            // Update high score
+            if (score > highScore) {
+                highScore = score;
+                document.getElementById('highscore').innerText = `High Score: ${highScore}`;
+            }
+        }
+
+        // Restart function
+        function restartGame() {
+            isGameOver = false;
+            score = 0;
+            kitty.y = canvas.height - 100;
+            obstacles.length = 0; // Clear obstacles
+            gameLoop(); // Restart the game loop
+        }
+
+        // Game loop
+        function gameLoop() {
+            if (isGameOver) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grass
+            drawGround();
+
+            // Draw Hello Kitty
+            kitty.draw();
+
+            // Apply gravity and handle jumping
+            if (isJumping) {
+                kitty.y -= jumpVelocity;
+                jumpVelocity -= gravity;
+
+                if (kitty.y >= canvas.height - 100) {
+                    kitty.y = canvas.height - 100;
+                    isJumping = false;
+                    jumpVelocity = 0;
+                }
+            }
+
+            // Manage obstacles
+            if (score % obstacleInterval === 0) {
+                const height = Math.random() * (100 - 50) + 50; // Random obstacle height
+                obstacles.push(new Obstacle(canvas.width, 20, height, obstacleImage));
+            }
+
+            obstacles.forEach((obstacle, index) => {
+                obstacle.update();
+
+                // Check collision
+                if (
+                    kitty.x < obstacle.x + obstacle.width &&
+                    kitty.x + kitty.width > obstacle.x &&
+                    kitty.y < obstacle.y + obstacle.height &&
+                    kitty.y + kitty.height > obstacle.y
+                ) {
+                    showGameOverScreen();
+                }
+
+                // Remove off-screen obstacles
+                if (obstacle.x + obstacle.width < 0) {
+                    obstacles.splice(index, 1);
+                }
+            });
+
+            // Update score
+            score++;
+            document.getElementById('score').innerText = `Score: ${score}`;
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event listener for jumping
+        window.addEventListener('keydown', (e) => {
+            if (isGameOver && e.code === 'Space') {
+                restartGame();
+            } else if (e.code === 'Space' && !isJumping) {
+                isJumping = true;
+                jumpVelocity = 12;
+            }
+        });
+
+        // Start the game
+        gameLoop();
+
+        // Ensure background music plays after user interaction
+        const backgroundMusic = document.getElementById('backgroundMusic');
+        window.addEventListener('click', () => {
+            backgroundMusic.play().catch(err => console.error("Audio playback error:", err));
+        });
+    </script>
+    <div style="position: absolute; bottom: 10px; width: 100%; text-align: center; font-family: Arial, sans-serif; font-size: 14px; color: #880e4f;">
+        Programmed by Jaeden Wilberforce and Graphic Design by Lebene Amenuvor and Nyhira Odoom
+    </div>
+</body>
+</html>
